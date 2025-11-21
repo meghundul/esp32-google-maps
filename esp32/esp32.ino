@@ -36,33 +36,40 @@ void onCharacteristicWrite(const String& uuid, uint8_t* data, size_t length) {
     }
 
     if (uuid == CHA_NAV_TBT_ICON) {
+    
         int semicolonIndex = -1;
-        for (uint8_t i = 0; i < 16; i++) {
+        for (uint16_t i = 0; i < length; i++) {
             if (data[i] == ';') {
                 semicolonIndex = i;
                 break;
             }
         }
-
+    
         if (semicolonIndex <= 0) {
-            Serial.println("No hash found");
+            Serial.println("Invalid icon packet: no semicolon");
             return;
         }
-
-        String iconHash = String((char*)data, semicolonIndex);
-        auto iconSize   = length - semicolonIndex - 1;
-        Serial.println(String("Received icon w/ hash: ") + iconHash + " size: " + iconSize);
-
+    
+        String iconHash;
+        iconHash.reserve(64);
+        for (int i = 0; i < semicolonIndex; i++) {
+            iconHash += (char)data[i];
+        }
+    
+        size_t iconSize = length - (semicolonIndex + 1);
         if (iconSize != ICON_BITMAP_BUFFER_SIZE) {
-            Serial.println("Invalid icon size");
+            Serial.print("Invalid icon bitmap size: ");
+            Serial.println(iconSize);
             return;
         }
-
-        // LVGL9: do not use lv_img_cache_* (not available). Just hand the raw buffer to Data.
-        Data::receiveNewIcon(iconHash, data + semicolonIndex + 1);
-
+    
+        const uint8_t* bitmap = data + semicolonIndex + 1;
+    
+        Data::receiveNewIcon(iconHash, bitmap);
+    
         pongNavigation();
     }
+
 
     if (uuid == CHA_GPS_SPEED) {
         navigationQueue.push(String("speed=") + value);
